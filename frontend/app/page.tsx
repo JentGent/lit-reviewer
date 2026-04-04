@@ -21,20 +21,15 @@ export default function Home() {
 
     let data;
 
-    try {
-      const res = await fetch(`${API_BASE}/get-references`, {
-        method: "POST",
-        body: formData,
-      });
+    const res = await fetch(`${API_BASE}/get-references`, {
+      method: "POST",
+      body: formData,
+    });
 
-      data = await res.json();
+    data = await res.json();
 
-      if (!res.ok) {
-        setStatus(data.error || "Upload failed.");
-        return;
-      }
-    } catch (e) {
-      setStatus("Upload failed.");
+    if (!res.ok) {
+      setStatus("Upload failed: " + (res.status ?? "") + " " + (data.detail ?? "Unknown error"));
       return;
     }
 
@@ -43,9 +38,9 @@ export default function Home() {
 
   return (
     <main className="p-10 max-w-xl">
-      <h1 className="text-2xl font-bold">PDF Citation Extractor</h1>
+      <h1 className="text-2xl font-bold">Lit Reviewer</h1>
       <p className="mt-2 text-gray-600">
-        Upload a PDF and save it to the backend.
+        Upload a PDF and generate a list of references.
       </p>
 
       <div className="mt-6 flex flex-col gap-3">
