@@ -52,6 +52,7 @@ export default function Home() {
           }
         }
       }
+      setThinking(prev => prev + "\n\n(End of response)");
     } catch (err) {
       setThinking(err instanceof Error ? err.message : "Something went wrong");
     } finally {

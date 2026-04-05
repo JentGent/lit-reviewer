@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from schemas import RewriteQueryRequest
 from google import genai
 from google.genai import types
+from services.search_openalex import search_openalex
 import json
 
 app = FastAPI()
@@ -25,21 +26,27 @@ def root():
 
 @app.post("/api/rewrite-query")
 async def get_references(body: RewriteQueryRequest):
-    prompt = f"""
-You are an autonomous agent acting as a literature review assistant. Your task is to find relevant scientific literature based on a user's research problem, extract key direct quotes, and use those quotes to write a comprehensive literature review section.
+    system_prompt = f"""
+You are an autonomous agent acting as a literature review assistant. Your task is to find relevant scientific literature based on a given research problem, extract key direct quotes, and use those quotes to write a comprehensive literature review section.
 
-User's research problem:
-{body.query}
+Do not write anything from your own perspective; just use the information you find.
+Do not halluciate. Do not make anything up. Stick to the facts.
+Do not try to communicate with a user.
 """
     
     def stream():
         try:
             stream = client.models.generate_content_stream(
                 model="gemini-2.5-flash-lite",
-                contents=prompt,
+                contents="Research problem: " + body.query,
+                config=types.GenerateContentConfig(
+                    tools=[search_openalex],
+                    system_instruction=system_prompt,
+                )
             )
 
             for chunk in stream:
+                print(chunk)
                 if chunk.text:
                     data = json.dumps({"type": "chunk", "text": chunk.text})
                     yield f"data: {data}\n\n"
