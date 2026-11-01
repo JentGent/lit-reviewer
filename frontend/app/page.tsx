@@ -14,7 +14,11 @@ export default function Home() {
     setError("");
 
     try {
-      const rsp = await fetch(API_BASE + "/api/rewrite-query", {
+      if (!researchProblem || !researchProblem.trim()) {
+        throw new Error("Enter a research problem");
+      }
+
+      const rsp = await fetch(API_BASE + "/api/run", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -22,7 +26,7 @@ export default function Home() {
         body: JSON.stringify({ query: researchProblem }),
       });
       if (!rsp.ok || !rsp.body) {
-        throw new Error("Failed to rewrite query");
+        throw new Error("Error " + rsp.status + ": " + rsp.statusText);
       }
 
       const reader = rsp.body.getReader();

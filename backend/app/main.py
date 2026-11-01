@@ -5,6 +5,8 @@ from schemas import RewriteQueryRequest
 from google import genai
 from google.genai import types
 from services.search_openalex import search_openalex
+from services.read_paper import read_paper
+import secrets
 import json
 
 app = FastAPI()
@@ -20,18 +22,35 @@ client = genai.Client(
     vertexai=True,
 )
 
+RUNS = {}
+
 @app.get("/")
 def root():
     return {"message": "Running"}
 
-@app.post("/api/rewrite-query")
+@app.post("/api/run")
 async def get_references(body: RewriteQueryRequest):
+    if not body.query or not body.query.strip():
+        raise HTTPException(status_code=400, detail="No query")
+    
+    state = {
+        "run_id": secrets.token_urlsafe(16),
+        "query": body.query,
+        "references": [],
+    }
+    RUNS[state["run_id"]] = state
+
     system_prompt = f"""
 You are an autonomous agent acting as a literature review assistant. Your task is to find relevant scientific literature based on a given research problem, extract key direct quotes, and use those quotes to write a comprehensive literature review section.
 
-Do not write anything from your own perspective; just use the information you find.
-Do not halluciate. Do not make anything up. Stick to the facts.
-Do not try to communicate with a user.
+Rules:
+- Do not write from your own knowledge; only use the information you find.
+- Do not hallucinate. Do not make anything up. Stick to the facts.
+- Do not try to communicate with a user.
+
+You have access to the following tools:
+- {search_openalex.__name__}: Use this to search for relevant scientific literature based on a keyword search. Please filter for the following: is_retracted:false,is_oa:true,has_doi:true
+- {read_paper.__name__}: Use this to attempt to read the text of a paper given its title. This is likely to fail, so please retry with a different paper in the search result (or try another search) if it does. Do not attempt to read the same paper twice. This is also likely to give extraneous text (e.g., HTML code). Look for the paper's abstract and results.
 """
     
     def stream():
@@ -40,13 +59,12 @@ Do not try to communicate with a user.
                 model="gemini-2.5-flash-lite",
                 contents="Research problem: " + body.query,
                 config=types.GenerateContentConfig(
-                    tools=[search_openalex],
+                    tools=[search_openalex, read_paper],
                     system_instruction=system_prompt,
                 )
             )
 
             for chunk in stream:
-                print(chunk)
                 if chunk.text:
                     data = json.dumps({"type": "chunk", "text": chunk.text})
                     yield f"data: {data}\n\n"
